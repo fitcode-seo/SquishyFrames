@@ -1,0 +1,9 @@
+## Interface: 80000
+## Title: Squishy Frames
+## Notes: Displays squishy indicators on party and raid frames
+## Author: YourName
+## SavedVariables: UFLSettings
+
+core.lua
+icon_overlay.lua
+ui.lua
