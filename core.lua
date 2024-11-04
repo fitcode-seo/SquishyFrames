@@ -94,10 +94,13 @@ local function SortGroupUnits(groupUnits)
         if b.role == "TANK" and a.role ~= "TANK" then return false end
         if a.role == "TANK" and b.role == "TANK" then return a.unit < b.unit end
 
-        -- Step 2: Dead players are always at the end, with no sorting within this group
-        if a.healthPercent == 0 and b.healthPercent ~= 0 then return false end
-        if b.healthPercent == 0 and a.healthPercent ~= 0 then return true end
-        if a.healthPercent == 0 and b.healthPercent == 0 then return a.unit < b.unit end
+        -- Step 2: Dead players are always at the end, regardless of range, with no sorting within this group
+        local aIsDead = UnitIsDeadOrGhost(a.unit)
+        local bIsDead = UnitIsDeadOrGhost(b.unit)
+        if aIsDead and not bIsDead then return false end
+        if bIsDead and not aIsDead then return true end
+        if aIsDead and bIsDead then return a.unit < b.unit end
+
 
         -- Step 3: Out-of-range players follow dead players, without sorting within this group
         if a.outOfRange and not b.outOfRange then return false end
@@ -244,9 +247,52 @@ local function UpdateOutOfRangeUnits()
     end
 end
 
+-- Function to apply an overlay based on the physical display of a debuff icon
+local function ApplyDebuffOverlay(frame)
+    if not frame or frame:IsForbidden() then return end
+
+    -- Ensure overlay exists
+    if not frame.overlay then
+        frame.overlay = frame:CreateTexture(nil, "OVERLAY")
+        frame.overlay:SetAllPoints()
+        frame.overlay:SetColorTexture(0.3, 0.8, 0.7, 0.65)  -- Turquoise/magenta at 30% transparency
+    end
+
+    local debuffIconShowing = false
+
+    -- Check if the unit is in range and alive before applying overlay
+    local unit = frame.unit
+    if UnitExists(unit) and not UnitIsDeadOrGhost(unit) and UnitInRange(unit) then
+        -- Check debuff frames for physical visibility (indicating an active debuff icon)
+        for i = 1, frame.maxDebuffs or 3 do
+            local debuffFrame = frame.debuffFrames and frame.debuffFrames[i]
+
+            -- Check if debuff frame is physically shown on the bottom-left (debuff location)
+            if debuffFrame and debuffFrame:IsShown() and debuffFrame:GetPoint() == "BOTTOMLEFT" then
+                debuffIconShowing = true
+                break
+            end
+        end
+    end
+
+    -- Toggle overlay based on whether the physical debuff icon is shown
+    if debuffIconShowing then
+        frame.overlay:Show()
+    else
+        frame.overlay:Hide()
+    end
+end
+
+-- Hook into the Blizzard function to detect updates on auras, specifically checking for debuff icon visibility
+hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+    ApplyDebuffOverlay(frame)
+end)
 
 
-
+-- Hook into the Blizzard function that updates auras on unit frames
+hooksecurefunc("CompactUnitFrame_UpdateAuras", function(frame)
+    ApplyDebuffOverlay(frame)
+end)
 
 -- Function to update health statuses
 local function UpdateHealthStatuses()
